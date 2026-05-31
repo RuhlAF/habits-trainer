@@ -1,0 +1,33 @@
+{
+  "name": "Habits Trainer",
+  "short_name": "Habits",
+  "description": "A mobile-first habit trainer for reminders, daily check-ins, scoring, and history.",
+  "id": "/habits-trainer/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f3ec",
+  "theme_color": "#f6f3ec",
+  "categories": ["health", "lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png?v=20",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png?v=20",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png?v=20",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

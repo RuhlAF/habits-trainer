@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f6f3ec">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Habits">
+    <meta name="description" content="A mobile-first habit trainer for daily practice, reminders, scoring, and progress history.">
+    <link rel="manifest" href="manifest.webmanifest?v=20">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=20">
+    <link rel="stylesheet" href="styles.css?v=20">
+    <title>Habits Trainer</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="todayLabel">Today</p>
+          <h1>Habits Trainer</h1>
+        </div>
+        <button class="icon-button" id="installButton" type="button" hidden aria-label="Install app">
+          <span aria-hidden="true">+</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="summary-grid" aria-label="Habit summary">
+          <article class="metric-card">
+            <span class="metric-label">Today</span>
+            <strong id="todayRate">0%</strong>
+            <span id="todayDone">0 of 0 kept</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Habits</span>
+            <strong id="activeHabits">0</strong>
+            <span>active</span>
+          </article>
+        </section>
+
+        <section class="notice-card" id="notificationPanel" aria-live="polite">
+          <div>
+            <span class="mini-label">Reminders</span>
+            <p id="notificationStatus">Enable notifications for timely habit nudges.</p>
+          </div>
+          <button class="secondary-button" id="enableNotificationsButton" type="button">Enable</button>
+        </section>
+
+        <section class="daily-quote-card" aria-label="Quote of the day">
+          <span class="mini-label">Quote of the Day</span>
+          <blockquote id="dailyQuoteText"></blockquote>
+          <p id="dailyQuoteAuthor"></p>
+        </section>
+
+        <nav class="tabbar" aria-label="Primary views">
+          <button class="tab-button is-active" type="button" data-view="today">Today</button>
+          <button class="tab-button" type="button" data-view="all">All</button>
+          <button class="tab-button" type="button" data-view="add">Add</button>
+        </nav>
+
+        <section class="view is-active" id="todayView" aria-labelledby="todayHeading">
+          <div class="section-heading">
+            <h2 id="todayHeading">Keep Today</h2>
+            <span id="dueCount">0 left</span>
+          </div>
+          <div class="habit-list" id="todayHabits"></div>
+          <div class="empty-state" id="todayEmpty" hidden>
+            <h3>No habits due today</h3>
+            <p>Add a habit or enjoy the breathing room.</p>
+          </div>
+        </section>
+
+        <section class="view" id="allView" aria-labelledby="allHeading">
+          <div class="section-heading">
+            <h2 id="allHeading">All Habits</h2>
+            <span id="allCount">0 active</span>
+          </div>
+          <div class="habit-list" id="allHabits"></div>
+          <div class="empty-state" id="allEmpty" hidden>
+            <h3>No habits yet</h3>
+            <p>Add one small practice to begin.</p>
+          </div>
+        </section>
+
+        <section class="view" id="addView" aria-labelledby="addHeading">
+          <div class="section-heading">
+            <h2 id="addHeading">New Habit</h2>
+          </div>
+          <form class="habit-form" id="habitForm">
+            <label>
+              <span>Habit</span>
+              <input id="habitName" name="habitName" type="text" maxlength="48" autocomplete="off" required placeholder="Morning walk">
+            </label>
+
+            <label>
+              <span>Reminder time</span>
+              <input id="habitTime" name="habitTime" type="time" value="08:00" required>
+            </label>
+
+            <fieldset>
+              <legend>Frequency</legend>
+              <div class="segmented-control" role="group" aria-label="Reminder frequency">
+                <label>
+                  <input type="radio" name="frequency" value="daily" checked>
+                  <span>Daily</span>
+                </label>
+                <label>
+                  <input type="radio" name="frequency" value="weekdays">
+                  <span>Weekdays</span>
+                </label>
+                <label>
+                  <input type="radio" name="frequency" value="custom">
+                  <span>Custom</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="day-picker" id="customDays" hidden>
+              <legend>Reminder days</legend>
+              <div class="day-grid">
+                <label><input type="checkbox" name="day" value="1" checked><span>Mon</span></label>
+                <label><input type="checkbox" name="day" value="2" checked><span>Tue</span></label>
+                <label><input type="checkbox" name="day" value="3" checked><span>Wed</span></label>
+                <label><input type="checkbox" name="day" value="4" checked><span>Thu</span></label>
+                <label><input type="checkbox" name="day" value="5" checked><span>Fri</span></label>
+                <label><input type="checkbox" name="day" value="6"><span>Sat</span></label>
+                <label><input type="checkbox" name="day" value="0"><span>Sun</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Accent</legend>
+              <div class="swatch-grid">
+                <label><input type="radio" name="color" value="#2f7d6d" checked><span style="--swatch:#2f7d6d"></span></label>
+                <label><input type="radio" name="color" value="#a45d2f"><span style="--swatch:#a45d2f"></span></label>
+                <label><input type="radio" name="color" value="#6f5aa8"><span style="--swatch:#6f5aa8"></span></label>
+                <label><input type="radio" name="color" value="#b83f54"><span style="--swatch:#b83f54"></span></label>
+                <label><input type="radio" name="color" value="#3f6b96"><span style="--swatch:#3f6b96"></span></label>
+              </div>
+            </fieldset>
+
+            <button class="primary-button" type="submit">Add Habit</button>
+          </form>
+        </section>
+
+      </main>
+    </div>
+
+    <template id="habitCardTemplate">
+      <article class="habit-card">
+        <div class="habit-main">
+          <div class="score-gauge" aria-label="Habit adoption score">
+            <svg class="gauge-svg" viewBox="0 0 120 88" aria-hidden="true">
+              <path class="gauge-band gauge-red" d="M12 62 A48 48 0 0 1 26.06 28.06"></path>
+              <path class="gauge-band gauge-yellow" d="M26.06 28.06 A48 48 0 0 1 98.83 33.79"></path>
+              <path class="gauge-band gauge-green" d="M98.83 33.79 A48 48 0 0 1 108 62"></path>
+              <g class="gauge-needle-group">
+                <line class="gauge-needle-svg" x1="60" y1="62" x2="18" y2="62"></line>
+              </g>
+              <circle class="gauge-hub-svg" cx="60" cy="62" r="18"></circle>
+              <text class="gauge-streak" x="60" y="62"></text>
+              <text class="gauge-label" x="60" y="73">days</text>
+              <text class="gauge-range gauge-new" x="12" y="84">New</text>
+              <text class="gauge-range gauge-established" x="108" y="84">Set</text>
+            </svg>
+          </div>
+          <div>
+            <h3></h3>
+            <p class="habit-meta"></p>
+          </div>
+        </div>
+        <div class="habit-stats" aria-label="Habit streaks">
+          <div>
+            <span class="stat-label">Formation</span>
+            <strong class="formation-stage"></strong>
+          </div>
+          <div>
+            <span class="stat-label">Best Streak</span>
+            <strong class="best-streak"></strong>
+          </div>
+        </div>
+        <div class="habit-history" aria-label="Habit history">
+          <div class="habit-history-head">
+            <span class="stat-label">History</span>
+            <span>Last 28 days</span>
+          </div>
+          <div class="history-grid"></div>
+        </div>
+        <div class="habit-actions">
+          <button class="keep-button" type="button"></button>
+          <button class="text-button" type="button"></button>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js?v=20" defer></script>
+  </body>
+</html>
