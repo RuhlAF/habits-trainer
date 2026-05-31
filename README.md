@@ -7,7 +7,9 @@ A mobile-first static PWA for iOS-friendly habit tracking.
 - Add habits with daily, weekday, or custom-day reminder schedules.
 - Mark habits kept each day.
 - Track adoption score, streaks, and 28-day history.
-- Show one shared quote of the day from a 366-entry rotation.
+- Show one shared quote of the day from a shuffled 1,000+ entry rotation.
+- Preserve local habit data across app updates with versioned state migration.
+- Export and import habit backups as JSON.
 - Offline app shell with a service worker.
 - Install metadata and iOS home-screen icon support.
 - Notification permission flow plus reminder notifications while the app is active or installed and running.

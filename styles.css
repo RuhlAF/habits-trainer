@@ -246,7 +246,8 @@ h3 {
 
 .habit-card,
 .empty-state,
-.habit-form {
+.habit-form,
+.data-card {
   border: 1px solid rgba(221, 216, 203, 0.88);
   border-radius: 8px;
   background: var(--panel);
@@ -254,7 +255,54 @@ h3 {
 }
 
 .habit-card {
+  position: relative;
   padding: 14px;
+}
+
+.habit-card.is-kept-today .habit-main {
+  padding-right: 34px;
+}
+
+.kept-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(135deg, #28b8c9, #f1c83b 52%, #dd4961);
+  box-shadow: 0 8px 16px rgba(32, 35, 34, 0.16);
+}
+
+.kept-badge[hidden] {
+  display: none;
+}
+
+.kept-badge svg {
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+}
+
+.kept-badge path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kept-badge-shadow {
+  stroke: rgba(24, 35, 40, 0.34);
+  stroke-width: 10;
+  transform: translate(1px, 2px);
+}
+
+.kept-badge-check {
+  stroke: #fffdf8;
+  stroke-width: 8;
 }
 
 .habit-main {
@@ -424,7 +472,7 @@ blockquote {
 
 .habit-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
 }
 
@@ -464,6 +512,12 @@ blockquote {
   background: #eee9dc;
 }
 
+.form-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .empty-state {
   padding: 22px;
   text-align: center;
@@ -478,6 +532,32 @@ blockquote {
   display: grid;
   gap: 16px;
   padding: 16px;
+}
+
+.data-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.data-card h2 {
+  margin: 3px 0 0;
+}
+
+.data-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.data-card p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
 .habit-form label,
@@ -610,7 +690,7 @@ blockquote {
   }
 
   .habit-form fieldset,
-  .primary-button {
+  .form-actions {
     grid-column: 1 / -1;
   }
 }
@@ -620,5 +700,14 @@ blockquote {
     max-width: 390px;
     margin-left: 0;
     margin-right: auto;
+  }
+
+  .data-card {
+    grid-template-columns: 1fr;
+  }
+
+  .data-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Habits">
     <meta name="description" content="A mobile-first habit trainer for daily practice, reminders, scoring, and progress history.">
-    <link rel="manifest" href="manifest.webmanifest?v=20">
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=20">
-    <link rel="stylesheet" href="styles.css?v=20">
+    <link rel="manifest" href="manifest.webmanifest?v=23">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=23">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=23">
+    <link rel="stylesheet" href="styles.css?v=23">
     <title>Habits Trainer</title>
   </head>
   <body>
@@ -141,8 +141,24 @@
               </div>
             </fieldset>
 
-            <button class="primary-button" type="submit">Add Habit</button>
+            <div class="form-actions">
+              <button class="primary-button" id="habitSubmitButton" type="submit">Add Habit</button>
+              <button class="text-button" id="cancelEditButton" type="button" hidden>Cancel</button>
+            </div>
           </form>
+
+          <section class="data-card" aria-labelledby="backupHeading">
+            <div>
+              <span class="mini-label">Data</span>
+              <h2 id="backupHeading">Backup</h2>
+            </div>
+            <div class="data-actions">
+              <button class="secondary-button" id="exportBackupButton" type="button">Export</button>
+              <button class="text-button" id="importBackupButton" type="button">Import</button>
+            </div>
+            <p id="backupStatus" aria-live="polite">Ready</p>
+            <input id="importBackupFile" type="file" accept="application/json,.json" hidden>
+          </section>
         </section>
 
       </main>
@@ -150,6 +166,12 @@
 
     <template id="habitCardTemplate">
       <article class="habit-card">
+        <span class="kept-badge" hidden aria-label="Kept today">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <path class="kept-badge-shadow" d="M13 34 C18 39 22 44 27 48 C36 34 44 22 54 13"></path>
+            <path class="kept-badge-check" d="M13 34 C18 39 22 44 27 48 C36 34 44 22 54 13"></path>
+          </svg>
+        </span>
         <div class="habit-main">
           <div class="score-gauge" aria-label="Habit adoption score">
             <svg class="gauge-svg" viewBox="0 0 120 88" aria-hidden="true">
@@ -190,11 +212,12 @@
         </div>
         <div class="habit-actions">
           <button class="keep-button" type="button"></button>
-          <button class="text-button" type="button"></button>
+          <button class="edit-button text-button" type="button">Edit</button>
+          <button class="remove-button text-button" type="button"></button>
         </div>
       </article>
     </template>
 
-    <script src="app.js?v=20" defer></script>
+    <script src="app.js?v=23" defer></script>
   </body>
 </html>

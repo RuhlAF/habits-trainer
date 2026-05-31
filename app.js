@@ -2,6 +2,8 @@
   "use strict";
 
   const STORAGE_KEY = "habits-trainer-state-v1";
+  const STATE_SCHEMA_VERSION = 2;
+  const QUOTE_SHUFFLE_SEED = 20260531;
   const REMINDER_CHECK_MS = 30000;
 
   const quoteVoices = [
@@ -36,7 +38,18 @@
     "Keep faith with",
     "Let progress come from",
     "Strengthen tomorrow with",
-    "Return calmly to"
+    "Return calmly to",
+    "Make room today for",
+    "Give your attention to",
+    "Let the day be shaped by",
+    "Choose again through",
+    "Trust the compounding of",
+    "Anchor your effort in",
+    "Meet the moment with",
+    "Turn intention into",
+    "Let confidence grow from",
+    "Protect your progress with",
+    "Carry yourself forward through"
   ];
   const quoteThemes = [
     "one honest step",
@@ -101,10 +114,11 @@
     "a path made by walking",
     "the practice that shapes you"
   ];
-  const quotes = buildQuoteDeck();
+  const quotes = shuffleQuoteDeck(buildQuoteDeck());
 
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const defaultState = {
+    schemaVersion: STATE_SCHEMA_VERSION,
     habits: [],
     settings: {
       notificationsEnabled: false,
@@ -115,6 +129,7 @@
   let state = loadState();
   let deferredInstallPrompt = null;
   let reminderTimer = null;
+  let editingHabitId = null;
 
   const elements = {
     todayLabel: document.getElementById("todayLabel"),
@@ -129,7 +144,16 @@
     allEmpty: document.getElementById("allEmpty"),
     dailyQuoteText: document.getElementById("dailyQuoteText"),
     dailyQuoteAuthor: document.getElementById("dailyQuoteAuthor"),
+    addHeading: document.getElementById("addHeading"),
     habitForm: document.getElementById("habitForm"),
+    habitName: document.getElementById("habitName"),
+    habitTime: document.getElementById("habitTime"),
+    habitSubmitButton: document.getElementById("habitSubmitButton"),
+    cancelEditButton: document.getElementById("cancelEditButton"),
+    exportBackupButton: document.getElementById("exportBackupButton"),
+    importBackupButton: document.getElementById("importBackupButton"),
+    importBackupFile: document.getElementById("importBackupFile"),
+    backupStatus: document.getElementById("backupStatus"),
     customDays: document.getElementById("customDays"),
     notificationPanel: document.getElementById("notificationPanel"),
     notificationStatus: document.getElementById("notificationStatus"),
@@ -175,7 +199,12 @@
 
   function bindEvents() {
     document.querySelectorAll(".tab-button").forEach((button) => {
-      button.addEventListener("click", () => setView(button.dataset.view));
+      button.addEventListener("click", () => {
+        if (button.dataset.view === "add") {
+          resetHabitForm();
+        }
+        setView(button.dataset.view);
+      });
     });
 
     document.querySelectorAll("input[name='frequency']").forEach((radio) => {
@@ -184,7 +213,17 @@
       });
     });
 
-    elements.habitForm.addEventListener("submit", handleAddHabit);
+    elements.habitForm.addEventListener("submit", handleSaveHabit);
+    elements.cancelEditButton.addEventListener("click", () => {
+      resetHabitForm();
+      setView("all");
+    });
+    elements.exportBackupButton.addEventListener("click", exportBackup);
+    elements.importBackupButton.addEventListener("click", () => {
+      elements.importBackupFile.value = "";
+      elements.importBackupFile.click();
+    });
+    elements.importBackupFile.addEventListener("change", importBackup);
     elements.enableNotificationsButton.addEventListener("click", enableNotifications);
     elements.installButton.addEventListener("click", installApp);
 
@@ -207,7 +246,7 @@
     }
 
     try {
-      const registration = await navigator.serviceWorker.register("sw.js?v=20");
+      const registration = await navigator.serviceWorker.register("sw.js?v=23");
       await registration.update();
     } catch (error) {
       console.warn("Service worker registration failed", error);
@@ -223,9 +262,30 @@
     maybeSendReminders();
   }
 
-  function handleAddHabit(event) {
+  function handleSaveHabit(event) {
     event.preventDefault();
 
+    const input = readHabitForm();
+    if (!input) {
+      return;
+    }
+
+    if (editingHabitId) {
+      updateHabit(editingHabitId, input);
+    } else {
+      state.habits.unshift(createHabit({
+        ...input,
+        createdAt: dateKey(new Date())
+      }));
+    }
+
+    saveState();
+    resetHabitForm();
+    setView("all");
+    render();
+  }
+
+  function readHabitForm() {
     const formData = new FormData(elements.habitForm);
     const name = String(formData.get("habitName") || "").trim();
     const reminderTime = String(formData.get("habitTime") || "08:00");
@@ -239,23 +299,15 @@
 
     if (type === "custom" && days.length === 0) {
       elements.customDays.hidden = false;
-      return;
+      return null;
     }
 
-    state.habits.unshift(createHabit({
+    return {
       name,
       reminderTime,
       frequency: { type, days },
-      color,
-      createdAt: dateKey(new Date())
-    }));
-
-    saveState();
-    elements.habitForm.reset();
-    document.getElementById("habitTime").value = "08:00";
-    elements.customDays.hidden = true;
-    setView("all");
-    render();
+      color
+    };
   }
 
   function createHabit(input) {
@@ -317,12 +369,13 @@
     const today = dateKey(new Date());
     const dueToday = state.habits.filter((habit) => isDueOn(habit, today));
     const remainingToday = dueToday.filter((habit) => !habit.completions[today]);
+    const orderedDueToday = dueToday.slice().sort((a, b) => compareTodayHabits(a, b, today));
 
     elements.dueCount.textContent = `${remainingToday.length} left`;
     elements.todayHabits.innerHTML = "";
     elements.todayEmpty.hidden = dueToday.length > 0;
 
-    dueToday.forEach((habit) => {
+    orderedDueToday.forEach((habit) => {
       const card = buildHabitCard(habit, today);
       elements.todayHabits.appendChild(card);
     });
@@ -344,10 +397,12 @@
   function buildHabitCard(habit, today) {
     const fragment = elements.template.content.cloneNode(true);
     const card = fragment.querySelector(".habit-card");
+    const keptBadge = fragment.querySelector(".kept-badge");
     const title = fragment.querySelector("h3");
     const meta = fragment.querySelector(".habit-meta");
     const keepButton = fragment.querySelector(".keep-button");
-    const removeButton = fragment.querySelector(".text-button");
+    const editButton = fragment.querySelector(".edit-button");
+    const removeButton = fragment.querySelector(".remove-button");
     const gauge = fragment.querySelector(".score-gauge");
     const gaugeNeedle = gauge.querySelector(".gauge-needle-group");
     const gaugeStreak = gauge.querySelector(".gauge-streak");
@@ -359,6 +414,8 @@
     const isKept = Boolean(habit.completions[today]);
 
     card.style.setProperty("--accent", habit.color);
+    card.classList.toggle("is-kept-today", isDueToday && isKept);
+    keptBadge.hidden = !(isDueToday && isKept);
     gaugeNeedle.setAttribute("transform", `rotate(${score.score * 1.8} 60 62)`);
     gaugeStreak.textContent = String(score.currentStreak);
     title.textContent = habit.name;
@@ -370,6 +427,7 @@
     keepButton.disabled = !isDueToday;
     keepButton.classList.toggle("is-kept", isKept);
     keepButton.addEventListener("click", () => toggleCompletion(habit.id, today));
+    editButton.addEventListener("click", () => startEditHabit(habit.id));
     removeButton.textContent = "Remove";
     removeButton.addEventListener("click", () => removeHabit(habit.id));
 
@@ -500,6 +558,78 @@
     elements.installButton.hidden = true;
   }
 
+  function exportBackup() {
+    const backup = {
+      app: "habits-trainer",
+      schemaVersion: STATE_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      state: migrateState(state)
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `habits-trainer-backup-${dateKey(new Date())}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setBackupStatus("Backup exported.");
+  }
+
+  async function importBackup(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(await file.text());
+      const importedState = migrateState(extractBackupState(parsed));
+      const habitCount = importedState.habits.length;
+      const message = habitCount === 1
+        ? "Replace current data with 1 habit from this backup?"
+        : `Replace current data with ${habitCount} habits from this backup?`;
+
+      if (!window.confirm(message)) {
+        setBackupStatus("Import canceled.");
+        return;
+      }
+
+      state = importedState;
+      saveState();
+      resetHabitForm();
+      render();
+      setBackupStatus("Backup imported.");
+    } catch (error) {
+      console.warn("Backup import failed", error);
+      setBackupStatus("Import failed. Choose a Habits backup JSON file.");
+    } finally {
+      elements.importBackupFile.value = "";
+    }
+  }
+
+  function extractBackupState(parsed) {
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("Backup is not an object.");
+    }
+
+    if (parsed.app === "habits-trainer" && parsed.state) {
+      return parsed.state;
+    }
+
+    if (Array.isArray(parsed.habits) || parsed.settings) {
+      return parsed;
+    }
+
+    throw new Error("Backup does not contain Habits state.");
+  }
+
+  function setBackupStatus(message) {
+    elements.backupStatus.textContent = message;
+  }
+
   function toggleCompletion(habitId, key) {
     const habit = state.habits.find((item) => item.id === habitId);
     if (!habit) {
@@ -518,8 +648,81 @@
 
   function removeHabit(habitId) {
     state.habits = state.habits.filter((habit) => habit.id !== habitId);
+    if (editingHabitId === habitId) {
+      resetHabitForm();
+    }
     saveState();
     render();
+  }
+
+  function startEditHabit(habitId) {
+    const habit = state.habits.find((item) => item.id === habitId);
+    if (!habit) {
+      return;
+    }
+
+    const frequency = habit.frequency || { type: "daily", days: [] };
+    editingHabitId = habit.id;
+    elements.addHeading.textContent = "Edit Habit";
+    elements.habitSubmitButton.textContent = "Save Habit";
+    elements.cancelEditButton.hidden = false;
+    elements.habitName.value = habit.name;
+    elements.habitTime.value = habit.reminderTime;
+    setRadioValue("frequency", frequency.type);
+    setRadioValue("color", habit.color);
+    setDayCheckboxes(frequency);
+    elements.customDays.hidden = frequency.type !== "custom";
+    setView("add");
+    elements.habitName.focus();
+  }
+
+  function updateHabit(habitId, input) {
+    const habit = state.habits.find((item) => item.id === habitId);
+    if (!habit) {
+      return;
+    }
+
+    habit.name = input.name;
+    habit.reminderTime = input.reminderTime;
+    habit.frequency = input.frequency;
+    habit.color = input.color;
+  }
+
+  function resetHabitForm() {
+    editingHabitId = null;
+    elements.habitForm.reset();
+    elements.habitTime.value = "08:00";
+    elements.customDays.hidden = true;
+    elements.addHeading.textContent = "New Habit";
+    elements.habitSubmitButton.textContent = "Add Habit";
+    elements.cancelEditButton.hidden = true;
+  }
+
+  function setRadioValue(name, value) {
+    const input = Array.from(elements.habitForm.querySelectorAll(`input[name="${name}"]`))
+      .find((item) => item.value === value);
+    if (input) {
+      input.checked = true;
+    }
+  }
+
+  function setDayCheckboxes(frequency) {
+    const selectedDays = frequency.type === "custom" ? frequency.days : [1, 2, 3, 4, 5];
+
+    elements.habitForm.querySelectorAll('input[name="day"]').forEach((input) => {
+      input.checked = selectedDays.includes(Number(input.value));
+    });
+  }
+
+  function compareTodayHabits(a, b, today) {
+    const aKept = Boolean(a.completions[today]);
+    const bKept = Boolean(b.completions[today]);
+
+    if (aKept !== bKept) {
+      return Number(aKept) - Number(bKept);
+    }
+
+    return 0;
   }
 
   function getHabitScore(habit) {
@@ -641,6 +844,27 @@
     return deck;
   }
 
+  function shuffleQuoteDeck(deck) {
+    const random = seededRandom(QUOTE_SHUFFLE_SEED);
+    const shuffled = deck.slice();
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return shuffled;
+  }
+
+  function seededRandom(seed) {
+    let value = seed >>> 0;
+
+    return () => {
+      value = (value * 1664525 + 1013904223) >>> 0;
+      return value / 4294967296;
+    };
+  }
+
   function scoreLabel(score) {
     if (score >= 90) {
       return "Automatic";
@@ -736,25 +960,126 @@
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) {
-        return structuredClone(defaultState);
+        return cloneDefaultState();
       }
 
       const parsed = JSON.parse(saved);
-      return {
-        ...structuredClone(defaultState),
-        ...parsed,
-        settings: {
-          ...defaultState.settings,
-          ...(parsed.settings || {})
-        }
-      };
+      const migrated = migrateState(parsed);
+      persistState(migrated);
+      return migrated;
     } catch (error) {
       console.warn("State load failed", error);
-      return structuredClone(defaultState);
+      return cloneDefaultState();
     }
   }
 
   function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    state = migrateState(state);
+    persistState(state);
+  }
+
+  function persistState(nextState) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  }
+
+  function migrateState(input) {
+    const source = isPlainObject(input) ? input : {};
+    const settings = isPlainObject(source.settings) ? source.settings : {};
+    const notified = isPlainObject(settings.notified) ? settings.notified : {};
+
+    return {
+      ...cloneDefaultState(),
+      ...source,
+      schemaVersion: STATE_SCHEMA_VERSION,
+      habits: Array.isArray(source.habits)
+        ? source.habits.map(normalizeHabit).filter(Boolean)
+        : [],
+      settings: {
+        ...defaultState.settings,
+        ...settings,
+        notificationsEnabled: Boolean(settings.notificationsEnabled),
+        notified
+      }
+    };
+  }
+
+  function normalizeHabit(habit) {
+    if (!isPlainObject(habit)) {
+      return null;
+    }
+
+    const name = String(habit.name || "").trim();
+    if (!name) {
+      return null;
+    }
+
+    return {
+      ...habit,
+      id: String(habit.id || (crypto.randomUUID ? crypto.randomUUID() : Date.now() + Math.random())),
+      name,
+      reminderTime: isValidTime(habit.reminderTime) ? habit.reminderTime : "08:00",
+      frequency: normalizeFrequency(habit.frequency),
+      color: isValidColor(habit.color) ? habit.color : "#2f7d6d",
+      createdAt: isDateKey(habit.createdAt) ? habit.createdAt : dateKey(new Date()),
+      completions: normalizeCompletions(habit.completions)
+    };
+  }
+
+  function normalizeFrequency(frequency) {
+    if (!isPlainObject(frequency)) {
+      return { type: "daily", days: [] };
+    }
+
+    if (frequency.type === "weekdays") {
+      return { type: "weekdays", days: [] };
+    }
+
+    if (frequency.type === "custom") {
+      return {
+        type: "custom",
+        days: Array.isArray(frequency.days)
+          ? [...new Set(frequency.days.map(Number).filter((day) => day >= 0 && day <= 6))]
+          : []
+      };
+    }
+
+    return { type: "daily", days: [] };
+  }
+
+  function normalizeCompletions(completions) {
+    if (!isPlainObject(completions)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(completions)
+        .filter(([key, value]) => isDateKey(key) && value)
+        .map(([key, value]) => [key, String(value)])
+    );
+  }
+
+  function cloneDefaultState() {
+    return structuredClone(defaultState);
+  }
+
+  function isPlainObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isDateKey(value) {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  }
+
+  function isValidTime(value) {
+    if (typeof value !== "string" || !/^\d{2}:\d{2}$/.test(value)) {
+      return false;
+    }
+
+    const [hours, minutes] = value.split(":").map(Number);
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+  }
+
+  function isValidColor(value) {
+    return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
   }
 })();
