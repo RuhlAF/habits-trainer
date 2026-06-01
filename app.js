@@ -154,6 +154,8 @@
     importBackupButton: document.getElementById("importBackupButton"),
     importBackupFile: document.getElementById("importBackupFile"),
     backupStatus: document.getElementById("backupStatus"),
+    historyEditor: document.getElementById("historyEditor"),
+    editHistoryGrid: document.getElementById("editHistoryGrid"),
     customDays: document.getElementById("customDays"),
     notificationPanel: document.getElementById("notificationPanel"),
     notificationStatus: document.getElementById("notificationStatus"),
@@ -246,7 +248,7 @@
     }
 
     try {
-      const registration = await navigator.serviceWorker.register("sw.js?v=23");
+      const registration = await navigator.serviceWorker.register("sw.js?v=24");
       await registration.update();
     } catch (error) {
       console.warn("Service worker registration failed", error);
@@ -292,6 +294,7 @@
     const type = String(formData.get("frequency") || "daily");
     const color = String(formData.get("color") || "#2f7d6d");
     const days = formData.getAll("day").map((value) => Number(value));
+    const historyDays = formData.getAll("historyDay").map(String);
 
     if (!name) {
       return;
@@ -306,7 +309,8 @@
       name,
       reminderTime,
       frequency: { type, days },
-      color
+      color,
+      historyDays
     };
   }
 
@@ -456,7 +460,7 @@
 
     if (Notification.permission === "granted") {
       state.settings.notificationsEnabled = true;
-      elements.notificationStatus.textContent = "Notifications are enabled for scheduled nudges.";
+      elements.notificationStatus.textContent = "Notifications are enabled while the app is open. Closed-app reminders need Web Push.";
       elements.enableNotificationsButton.textContent = "Enabled";
       elements.enableNotificationsButton.disabled = true;
     } else if (Notification.permission === "denied") {
@@ -465,7 +469,7 @@
       elements.enableNotificationsButton.textContent = "Blocked";
       elements.enableNotificationsButton.disabled = true;
     } else {
-      elements.notificationStatus.textContent = "Enable notifications for timely habit nudges.";
+      elements.notificationStatus.textContent = "Enable app-open reminders. Closed-app reminders need Web Push.";
       elements.enableNotificationsButton.textContent = "Enable";
       elements.enableNotificationsButton.disabled = false;
     }
@@ -671,7 +675,9 @@
     setRadioValue("frequency", frequency.type);
     setRadioValue("color", habit.color);
     setDayCheckboxes(frequency);
+    renderHistoryEditor(habit);
     elements.customDays.hidden = frequency.type !== "custom";
+    elements.historyEditor.hidden = false;
     setView("add");
     elements.habitName.focus();
   }
@@ -686,6 +692,7 @@
     habit.reminderTime = input.reminderTime;
     habit.frequency = input.frequency;
     habit.color = input.color;
+    habit.completions = mergeEditedHistory(habit, input.historyDays);
   }
 
   function resetHabitForm() {
@@ -693,6 +700,8 @@
     elements.habitForm.reset();
     elements.habitTime.value = "08:00";
     elements.customDays.hidden = true;
+    elements.historyEditor.hidden = true;
+    elements.editHistoryGrid.innerHTML = "";
     elements.addHeading.textContent = "New Habit";
     elements.habitSubmitButton.textContent = "Add Habit";
     elements.cancelEditButton.hidden = true;
@@ -712,6 +721,44 @@
     elements.habitForm.querySelectorAll('input[name="day"]').forEach((input) => {
       input.checked = selectedDays.includes(Number(input.value));
     });
+  }
+
+  function renderHistoryEditor(habit) {
+    elements.editHistoryGrid.innerHTML = "";
+
+    lastNDates(28).forEach((key) => {
+      const date = parseDateKey(key);
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      const span = document.createElement("span");
+
+      input.type = "checkbox";
+      input.name = "historyDay";
+      input.value = key;
+      input.checked = Boolean(habit.completions[key]);
+      input.setAttribute("aria-label", `${formatDate(key)} kept`);
+      span.textContent = String(date.getDate());
+      span.title = `${formatDate(key)}: ${input.checked ? "kept" : "not kept"}`;
+      label.classList.toggle("is-due", isScheduledOn(habit, key));
+      label.append(input, span);
+      elements.editHistoryGrid.appendChild(label);
+    });
+  }
+
+  function mergeEditedHistory(habit, historyDays) {
+    const editableDates = new Set(lastNDates(28));
+    const keptDates = new Set(historyDays);
+    const completions = Object.fromEntries(
+      Object.entries(habit.completions || {}).filter(([key]) => !editableDates.has(key))
+    );
+
+    editableDates.forEach((key) => {
+      if (keptDates.has(key)) {
+        completions[key] = habit.completions[key] || new Date().toISOString();
+      }
+    });
+
+    return completions;
   }
 
   function compareTodayHabits(a, b, today) {

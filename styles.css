@@ -560,6 +560,59 @@ blockquote {
   font-weight: 700;
 }
 
+.history-editor {
+  grid-column: 1 / -1;
+}
+
+.history-editor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.history-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.history-edit-grid label {
+  position: relative;
+  min-width: 0;
+}
+
+.history-edit-grid input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.history-edit-grid span {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #f0ece2;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.history-edit-grid label.is-due span {
+  background: rgba(214, 166, 63, 0.25);
+}
+
+.history-edit-grid input:checked + span {
+  border-color: transparent;
+  color: #fff;
+  background: var(--green-dark);
+}
+
 .habit-form label,
 .habit-form fieldset {
   min-width: 0;
